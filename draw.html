@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        margin: 0px;
+        padding: 0px;
+      }
+      #paint {
+        width: 20rem;
+        height: 15rem;
+        border: 1px solid #e20074;
+        margin: auto;
+      }
+      #predicted {
+        width: 15rem;
+        height: 10rem;
+        border: 1px solid #e20074;
+        margin: auto;
+      }
+      #p-number {
+        display: flex;
+        font-size: 5rem;
+        justify-content: center;
+      }
+      .parent {
+        margin: 2rem auto;
+        width: 50rem;
+        border: 1px solid cyan;
+      }
+      .input {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border: 1px solid #e20074;
+        margin: 0.5rem 0.5rem;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.5.2/dist/tf.min.js"></script>
+  </head>
+
+  <body data-rsssl="1">
+    <div class="parent">
+      <div class="input">
+        <div>MNITS Keras CNN Model.</div>
+        <div>Draw number between 0-9 in below box.</div>
+        <div id="paint">
+          <canvas id="myCanvas"></canvas>
+        </div>
+        <button onclick="clean()">Clear</button>
+      </div>
+      <div class="input">
+        <div id="pre-txt">Predicted number</div>
+        <div id="predicted">
+          <div id="p-number"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      tf.loadLayersModel("model/CNN/model.json")
+        .then(function (model) {
+          window.model = model;
+        })
+        .catch((e) => {
+          console.log("error: e", e);
+        });
+
+      var canvas = document.getElementById("myCanvas");
+      var ctx = canvas.getContext("2d");
+
+      var painting = document.getElementById("paint");
+      var paint_style = getComputedStyle(painting);
+      canvas.width = parseInt(paint_style.getPropertyValue("width"));
+      canvas.height = parseInt(paint_style.getPropertyValue("height"));
+
+      var mouse = { x: 0, y: 0 };
+
+      canvas.addEventListener(
+        "mousemove",
+        function (e) {
+          mouse.x = e.pageX - this.offsetLeft;
+          mouse.y = e.pageY - this.offsetTop;
+        },
+        false
+      );
+
+      ctx.lineWidth = 15;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#e20074";
+
+      canvas.addEventListener(
+        "mousedown",
+        function (e) {
+          ctx.beginPath();
+          ctx.moveTo(mouse.x, mouse.y);
+
+          canvas.addEventListener("mousemove", onPaint, false);
+        },
+        false
+      );
+
+      canvas.addEventListener(
+        "mouseup",
+        function () {
+          canvas.removeEventListener("mousemove", onPaint, false);
+          var img = new Image();
+          img.onload = function () {
+            ctx.drawImage(img, 0, 0, 28, 28);
+            data = ctx.getImageData(0, 0, 28, 28).data;
+            var input = [];
+            for (var i = 0; i < data.length; i += 4) {
+              input.push(data[i + 2] / 255);
+            }
+            predict(input);
+          };
+          img.src = canvas.toDataURL("image/png");
+        },
+        false
+      );
+
+      var onPaint = function () {
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.stroke();
+      };
+
+      function clean() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById("p-number").innerHTML = "";
+      }
+
+      var predict = function (input) {
+        if (window.model) {
+          const shape = [1, 28, 28, 1];
+          window.model
+            .predict([tf.tensor(input).reshape(shape)])
+            .array()
+            .then(function (scores) {
+              scores = scores[0];
+              predicted = scores.indexOf(Math.max(...scores));
+              document.getElementById("p-number").innerHTML = predicted;
+            });
+        } else {
+          setTimeout(function () {
+            predict(input);
+          }, 50);
+        }
+      };
+    </script>
+  </body>
+</html>
